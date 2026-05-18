@@ -55,6 +55,17 @@ jobs:
       - name: Type check frontend
         run: bun run build
 
+      # tauri::generate_context! validates that every `externalBin` path
+      # resolves to a file at compile time. CI doesn't build the real
+      # PyInstaller sidecar (that lives in the release workflow), so drop a
+      # zero-byte stub at the expected path to keep `cargo check` honest.
+      - name: Create sidecar stub for cargo check
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          TRIPLE=$(rustc -vV | awk '/^host:/ {print $2}')
+          touch "src-tauri/binaries/doc2latex-${TRIPLE}.exe"
+
       - name: Check Rust
         working-directory: src-tauri
         run: cargo check

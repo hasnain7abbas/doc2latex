@@ -186,9 +186,11 @@ cd android-app
 5. `tauri-action` and `softprops/action-gh-release` upload everything to the
    same GitHub Release tagged `vX.Y.Z`.
 
-No secrets needed — `GITHUB_TOKEN` is provided automatically. For signed
-Android releases, generate a keystore, store the password as a secret, and
-replace the "Sign APK" step.
+No secrets needed — `GITHUB_TOKEN` is provided automatically. The Android
+APK ships debug-signed (via `assembleDebug`) so it's installable on real
+devices without any extra setup. For a properly-signed release build,
+generate a keystore, store it + its password as repo secrets, and swap the
+"Build debug-signed APK" step for `assembleRelease` with a signing config.
 
 ## License
 

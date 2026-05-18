@@ -89,7 +89,10 @@ jobs:
           - platform: macos-latest
             args: "--target aarch64-apple-darwin"
             sidecar_ext: ""
-          - platform: macos-latest
+          # macos-13 is Intel; macos-latest is Apple Silicon. Cross-compiling
+          # a PyInstaller sidecar across arches isn't supported, so the x86_64
+          # build has to run on an x86_64 runner.
+          - platform: macos-13
             args: "--target x86_64-apple-darwin"
             sidecar_ext: ""
           - platform: ubuntu-22.04
@@ -117,7 +120,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -205,22 +208,24 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build release APK
+      # We build the debug variant rather than `assembleRelease` because
+      # `assembleRelease` produces `app-release-unsigned.apk`, which Android
+      # refuses to install. The debug variant is auto-signed with the Android
+      # SDK's debug keystore, so the APK is installable on real devices for
+      # early/internal distribution. Swap to a properly-signed release build
+      # once you've generated a keystore and stored it as a secret.
+      - name: Build debug-signed APK
         working-directory: android-app
         run: |
           if [ ! -f gradlew ]; then
             gradle wrapper --gradle-version 8.7
           fi
-          ./gradlew :app:assembleRelease --stacktrace
+          ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Sign APK
-        # The release APK is unsigned by default; for first-cut releases we
-        # ship the debug-signed build under a clear filename. Replace this
-        # step with proper signing once you've generated a keystore and
-        # added it as a secret.
+      - name: Rename APK for release
         run: |
-          cp android-app/app/build/outputs/apk/release/app-release-unsigned.apk \
-             android-app/app/build/outputs/apk/release/doc2latex-${{ needs.check-and-bump.outputs.version }}-unsigned.apk
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk \
+             android-app/app/build/outputs/apk/debug/doc2latex-${{ needs.check-and-bump.outputs.version }}.apk
 
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -228,7 +233,7 @@ jobs:
           tag_name: v${{ needs.check-and-bump.outputs.version }}
           name: "doc2latex v${{ needs.check-and-bump.outputs.version }}"
           files: |
-            android-app/app/build/outputs/apk/release/doc2latex-${{ needs.check-and-bump.outputs.version }}-unsigned.apk
+            android-app/app/build/outputs/apk/debug/doc2latex-${{ needs.check-and-bump.outputs.version }}.apk
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
