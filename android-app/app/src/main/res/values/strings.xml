@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">doc2latex</string>
+    <string name="subtitle">Offline document → LaTeX</string>
+    <string name="pick_document">Choose document</string>
+    <string name="no_file_selected">No file selected</string>
+    <string name="convert_to_latex">Convert to LaTeX</string>
+    <string name="idle"> </string>
+</resources>

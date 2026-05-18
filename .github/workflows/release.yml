@@ -1,0 +1,236 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ─── Job 1: Version check + auto-bump ─────────────────────────
+  check-and-bump:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.bump.outputs.should_release }}
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes and bump version
+        id: bump
+        run: |
+          CURRENT_VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          echo "Current version: $CURRENT_VERSION"
+
+          if git tag -l "v$CURRENT_VERSION" | grep -q "v$CURRENT_VERSION"; then
+            echo "Tag v$CURRENT_VERSION already exists"
+            COMMITS_SINCE=$(git rev-list "v$CURRENT_VERSION"..HEAD --count 2>/dev/null || echo "0")
+            echo "Commits since v$CURRENT_VERSION: $COMMITS_SINCE"
+
+            if [ "$COMMITS_SINCE" -eq "0" ]; then
+              echo "No new commits since last release — skipping"
+              echo "should_release=false" >> $GITHUB_OUTPUT
+              echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+            echo "Bumping: $CURRENT_VERSION → $NEW_VERSION"
+
+            # Sync all version-bearing files.
+            jq --arg v "$NEW_VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json
+            mv tmp.json src-tauri/tauri.conf.json
+
+            jq --arg v "$NEW_VERSION" '.version = $v' package.json > tmp.json
+            mv tmp.json package.json
+
+            sed -i "s/^version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" src-tauri/Cargo.toml
+            # Python pyproject.toml
+            sed -i "0,/^version = \".*\"$/{s/^version = \".*\"$/version = \"$NEW_VERSION\"/}" pyproject.toml
+            # Android versionName + versionCode
+            sed -i "s/versionName = \".*\"/versionName = \"$NEW_VERSION\"/" android-app/app/build.gradle.kts
+            # Bump versionCode monotonically by 1 each release.
+            CURRENT_CODE=$(grep -oP 'versionCode = \K[0-9]+' android-app/app/build.gradle.kts || echo 1)
+            NEW_CODE=$((CURRENT_CODE + 1))
+            sed -i "s/versionCode = $CURRENT_CODE/versionCode = $NEW_CODE/" android-app/app/build.gradle.kts
+
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add src-tauri/tauri.conf.json package.json src-tauri/Cargo.toml \
+                    pyproject.toml android-app/app/build.gradle.kts
+            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+            git push
+
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Tag v$CURRENT_VERSION does not exist — first release"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+  # ─── Job 2: Tauri desktop matrix (Win / macOS / Linux) ────────
+  tauri-release:
+    needs: check-and-bump
+    if: needs.check-and-bump.outputs.should_release == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+            sidecar_ext: ".exe"
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+            sidecar_ext: ""
+          - platform: macos-latest
+            args: "--target x86_64-apple-darwin"
+            sidecar_ext: ""
+          - platform: ubuntu-22.04
+            args: ""
+            sidecar_ext: ""
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      # Linux: webkit2gtk + bundler deps.
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Setup Python (for sidecar build)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install doc2latex + PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          # Mac cross-build needs the target Python — for now we build the
+          # sidecar for whichever Python is on the runner. ARM64 mac runners
+          # will produce arm64; x86_64 path produces x86_64 if a matching
+          # interpreter is available. (Apple Silicon GH runners are arm64.)
+          pip install pyinstaller
+
+      - name: Build PyInstaller sidecar
+        run: python packaging/build_sidecar.py
+        shell: bash
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Build & release with tauri-action
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: bun run tauri
+          tagName: v__VERSION__
+          releaseName: "doc2latex v__VERSION__"
+          releaseBody: |
+            ## doc2latex v__VERSION__
+
+            Offline document → LaTeX converter.
+
+            ### Downloads
+            | Platform | File |
+            |---|---|
+            | Windows | `.msi` (recommended) / `.exe` (NSIS) |
+            | macOS (Apple Silicon) | `.dmg` |
+            | macOS (Intel) | `.dmg` |
+            | Linux | `.deb` / `.AppImage` |
+            | Android | `.apk` (limited — no equation OCR) |
+
+            See README for the offline architecture, the PyInstaller sidecar,
+            and the Chaquopy-based Android build.
+          args: ${{ matrix.args }}
+          releaseDraft: false
+          prerelease: false
+
+  # ─── Job 3: Android APK ────────────────────────────────────────
+  android-release:
+    needs: check-and-bump
+    if: needs.check-and-bump.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Python (Chaquopy needs a host Python to resolve wheels)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release APK
+        working-directory: android-app
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.7
+          fi
+          ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Sign APK
+        # The release APK is unsigned by default; for first-cut releases we
+        # ship the debug-signed build under a clear filename. Replace this
+        # step with proper signing once you've generated a keystore and
+        # added it as a secret.
+        run: |
+          cp android-app/app/build/outputs/apk/release/app-release-unsigned.apk \
+             android-app/app/build/outputs/apk/release/doc2latex-${{ needs.check-and-bump.outputs.version }}-unsigned.apk
+
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.check-and-bump.outputs.version }}
+          name: "doc2latex v${{ needs.check-and-bump.outputs.version }}"
+          files: |
+            android-app/app/build/outputs/apk/release/doc2latex-${{ needs.check-and-bump.outputs.version }}-unsigned.apk
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

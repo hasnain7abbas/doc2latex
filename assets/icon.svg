@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="doc2latex icon">
+  <title>doc2latex</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded square background -->
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+
+  <!-- document with folded corner -->
+  <path d="M64 44 H148 L200 96 V216 H64 Z"
+        fill="#f8fafc" stroke="#0f172a" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M148 44 V96 H200"
+        fill="none" stroke="#0f172a" stroke-width="6" stroke-linejoin="round"/>
+
+  <!-- big integral on the page -->
+  <path d="M118 96
+           C 118 84, 138 78, 152 92
+           L 152 158
+           C 152 176, 128 182, 114 168"
+        fill="none" stroke="#1e3a8a" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- subtle body text lines below -->
+  <line x1="82" y1="188" x2="186" y2="188" stroke="#cbd5e1" stroke-width="5" stroke-linecap="round"/>
+  <line x1="82" y1="204" x2="156" y2="204" stroke="#cbd5e1" stroke-width="5" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,43 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+.coverage
+htmlcov/
+*.tex
+*_assets/
+tests/fixtures/out/
+
+# Node / Tauri / Vite
+node_modules/
+dist/
+dist-ssr/
+
+# Tauri Rust build artefacts
+src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/Cargo.lock
+
+# PyInstaller sidecar artefacts (built on CI; safe to keep local builds out)
+dist-sidecar/
+build-sidecar/
+src-tauri/binaries/doc2latex-*
+
+# Android
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+android-app/.idea/
+android-app/*.iml
+android-app/app/*.iml
+
+# IDE
+.vscode/
+.idea/
+*.swp

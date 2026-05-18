@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "doc2latex",
+  "version": "0.1.0",
+  "identifier": "com.doc2latex.app",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "doc2latex",
+        "width": 820,
+        "height": 720,
+        "minWidth": 560,
+        "minHeight": 480,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/doc2latex"
+    ],
+    "resources": [],
+    "category": "Productivity",
+    "shortDescription": "Offline document → LaTeX converter",
+    "longDescription": "Convert PDF, DOCX, JPEG, and PNG documents into compilable LaTeX. Runs fully offline; no telemetry."
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}

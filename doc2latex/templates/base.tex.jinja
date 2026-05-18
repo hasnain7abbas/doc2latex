@@ -1,0 +1,23 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+{% if title %}\title{ {{- title -}} }
+{% endif %}
+{% if author %}\author{ {{- author -}} }
+{% endif %}
+
+\begin{document}
+{% if title %}\maketitle
+{% endif %}
+{% for block in rendered_blocks %}
+{{ block }}
+
+{% endfor %}
+\end{document}
