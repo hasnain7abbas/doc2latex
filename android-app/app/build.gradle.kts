@@ -12,8 +12,8 @@ android {
         applicationId = "com.doc2latex.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
 
         // Chaquopy needs all ABIs the app supports declared up front.
         ndk {

@@ -1,6 +1,6 @@
 [package]
 name = "doc2latex-app"
-version = "0.1.0"
+version = "0.1.1"
 description = "doc2latex desktop GUI."
 authors = ["doc2latex"]
 edition = "2021"
