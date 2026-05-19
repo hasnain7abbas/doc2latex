@@ -3,6 +3,17 @@ name: Release
 on:
   push:
     branches: [main]
+    # Docs-only changes shouldn't bump the version or rebuild installers.
+    # `workflow_dispatch` is still available for manual re-runs that bypass
+    # this filter when you do want a release from a docs-only commit.
+    paths-ignore:
+      - '**/*.md'
+      - 'assets/**'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   workflow_dispatch:
 
 permissions:
